@@ -264,6 +264,7 @@ async def ingest_data(
         # In a production system, we might want to log this error.
 
     # 7. Return the structured JSON response from Gemini
+    print("[SorteraCore] Payload processed")
     return JSONResponse(content=structured_data)
 
 # Stripe webhook endpoint
