@@ -1,3 +1,9 @@
+
+
+
+
+<img width="230" height="357" alt="SorteraCore logo" src="https://github.com/user-attachments/assets/63504073-5c23-4f41-9262-63ce7f841f9a" />
+
 # Sortera API Core: Enterprise Data Ingestion & Sanitization Engine
 
 ## ⚡ SorteraCore Enterprise Production Access
