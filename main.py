@@ -267,23 +267,23 @@ async def ingest_data(
     print("[SorteraCore] Payload processed")
     return JSONResponse(content=structured_data)
 
-# Stripe webhook endpoint
-@app.post("/api/v2/payments/stripe-webhook")
-async def stripe_webhook(request: Request):
+# Razorpay webhook endpoint
+@app.post("/api/v2/payments/razorpay-webhook")
+async def razorpay_webhook(request: Request):
     """
-    Handle Stripe webhook events for automatic customer onboarding.
+    Handle Razorpay webhook events for automatic customer onboarding.
 
     Steps:
-    1. Listen for incoming transaction logs from Stripe.
-    2. If event type is 'checkout.session.completed', parse session metadata.
-    3. Extract company name or email from metadata.
+    1. Listen for incoming transaction logs from Razorpay.
+    2. If event type is 'payment.captured', parse payment entity.
+    3. Extract customer email from payload['payload']['payment']['entity']['email'].
     4. Insert new enterprise into database with:
         - Generated token (sk_live_...)
         - credit_balance = 100000
         - active_status = True
-    5. Return 200 to Stripe.
+    5. Return 200 to Razorpay.
     """
-    # Get the raw body for signature verification (in production, verify Stripe signature)
+    # Get the raw body for signature verification (in production, verify Razorpay signature)
     # For simplicity, we assume the payload is JSON and we don't verify signature here.
     # In a real implementation, you would verify the webhook signature using the endpoint secret.
     try:
@@ -296,33 +296,32 @@ async def stripe_webhook(request: Request):
             detail="Invalid JSON payload"
         )
 
-    # Check if this is a checkout.session.completed event
-    if event.get("type") == "checkout.session.completed":
-        session = event.get("data", {}).get("object", {})
-        metadata = session.get("metadata", {})
+    # Check if this is a payment.captured event
+    if event.get("event") == "payment.captured":
+        payment_entity = event.get("payload", {}).get("payment", {}).get("entity", {})
 
-        # Extract company name or email from metadata
-        # We'll look for 'company_name' or 'email' or 'client_reference_id'
-        company_name = (
-            metadata.get("company_name") or
-            metadata.get("email") or
-            metadata.get("client_reference_id") or
-            "New Customer"  # fallback
-        )
+        # Extract customer email from the nested payload structure
+        customer_email = payment_entity.get("email", "")
 
-        # If we got an email, we might want to use the part before @ as company name, but we'll keep it simple.
+        # Use email as company name, or use a fallback if email is not available
+        # Extract the part before @ as company name if email is provided
+        if customer_email and "@" in customer_email:
+            company_name = customer_email.split("@")[0]
+        else:
+            company_name = "New Customer"  # fallback
+
         # Create the enterprise
         try:
             enterprise = create_enterprise(company_name)
             # Log the creation (in production, you might want to send a welcome email, etc.)
-            print(f"Created new enterprise: {enterprise['id']} for {company_name}")
+            print(f"Created new enterprise: {enterprise['id']} for {company_name} with email {customer_email}")
         except Exception as e:
-            # If database error, we still return 200 to Stripe to avoid retries, but log the error.
+            # If database error, we still return 200 to Razorpay to avoid retries, but log the error.
             # In a real system, you might want to alert on this.
-            print(f"Failed to create enterprise from Stripe webhook: {str(e)}")
-            # We still return 200 so Stripe doesn't retry
+            print(f"Failed to create enterprise from Razorpay webhook: {str(e)}")
+            # We still return 200 so Razorpay doesn't retry
 
-    # Return 200 to Stripe to acknowledge receipt
+    # Return 200 to Razorpay to acknowledge receipt
     return JSONResponse(content={"status": "success"}, status_code=200)
 
 # Health check endpoint
